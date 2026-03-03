@@ -12,7 +12,7 @@ class TerminalBuffer (
     var currentAttributes : Attributes  = Attributes()
 
     fun getCursor(): Pair<Int, Int> {
-        return Pair(cursorCol, cursorRow)
+        return Pair(cursorRow, cursorCol)
     }
 
     fun inBounds(row : Int, col : Int) : Boolean {
