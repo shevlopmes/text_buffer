@@ -317,4 +317,94 @@ class TerminalBufferTest {
         assertEquals("abc", buffer.getLineAt(0))
         assertEquals("de ", buffer.getLineAt(1))
     }
+
+    @Test
+    fun GetNextEmptySimple() {
+        val buffer = TerminalBuffer(3, 2)
+        val p1 = buffer.getNextEmpty()
+        assertNotNull(p1)
+        assertEquals(0, p1.first)
+        assertEquals(0, p1.second)
+        buffer.overrideCharAtCursor('A')
+        val p2 = buffer.getNextEmpty()
+        assertNotNull(p2)
+        assertEquals(0, p2.first)
+        assertEquals(1, p2.second)
+        buffer.setCursor(0,2)
+        buffer.overrideCharAtCursor('B')
+        val p3 = buffer.getNextEmpty(0, 2)
+        assertNotNull(p3)
+        assertEquals(1, p3.first)
+        assertEquals(0, p3.second)
+    }
+
+    @Test
+    fun GetNextEmptyFullLine() {
+        val buffer = TerminalBuffer(2, 3)
+        buffer.overrideTextAtCursor("AB")
+        val p = buffer.getNextEmpty(0, 0)
+        assertNotNull(p)
+        assertEquals(1, p.first)
+        assertEquals(0, p.second)
+    }
+
+    @Test
+    fun GetNextEmptyNoEmpty() {
+        val buffer = TerminalBuffer(2, 2)
+        buffer.insertTextAtCursor("BCD")
+        buffer.setCursor(0,0)
+        buffer.insertCharAtCursor('A')
+        val p = buffer.getNextEmpty(0, 0)
+        assertNull(p)
+    }
+
+    @Test
+    fun InsertCharWhenNextEmptyExistsSameLine() {
+        val buffer = TerminalBuffer(5, 1)
+        buffer.overrideTextAtCursor("A_BC")
+        buffer.setCursor(0, 1)
+        buffer.insertCharAtCursor('X')
+        val line = buffer.getLineAt(0)
+        assertNotNull(line)
+        assertEquals("AX_BC", line)
+    }
+
+    @Test
+    fun InsertCharNextEmptyNextLine() {
+        val buffer = TerminalBuffer(2, 3)
+        buffer.overrideTextAtCursor("AB")
+        buffer.overrideTextAtCursor("CD")
+        buffer.setCursor(0,1)
+        buffer.insertCharAtCursor('X')
+        val screen = buffer.getScreen()
+        assertEquals("AX\nBC\nD ", screen)
+    }
+
+    @Test
+    fun InsertCharNoNextEmptyCursorNotFirstLine() {
+        val buffer = TerminalBuffer(3, 2)
+        buffer.insertTextAtCursor("BCDEF")
+        buffer.setCursor(0,0)
+        buffer.insertCharAtCursor('A')
+        buffer.setCursor(1, 1)
+        buffer.insertCharAtCursor('X')
+        val screen = buffer.getScreen()
+        assertEquals("DXE\nF  ", screen)
+        val all = buffer.getScreenAndScrollBack()
+        assertEquals("ABC\nDXE\nF  ", all)
+    }
+
+    @Test
+    fun InsertCharNoNextEmptyCursorFirstLine() {
+        val buffer = TerminalBuffer(3, 2)
+        buffer.insertTextAtCursor("BCDEF")
+        buffer.setCursor(0,0)
+        buffer.insertCharAtCursor('A')
+        buffer.setCursor(0, 1)
+        buffer.insertCharAtCursor('X')
+        val screen = buffer.getScreen()
+        assertEquals("CDE\nF  ", screen)
+        val all = buffer.getScreenAndScrollBack()
+        assertEquals("AXB\nCDE\nF  ", all)
+    }
 }

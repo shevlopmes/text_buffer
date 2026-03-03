@@ -157,4 +157,96 @@ class TerminalBuffer (
     fun getScreenAndScrollBack(): String {
         return (-scrollback.size..<height).joinToString("\n") { row -> getLineAt(row)!! }
     }
+
+    fun getNextEmpty(row: Int = cursorRow, col: Int = cursorCol): Pair<Int, Int>? {
+        var currentRow = row
+        var currentCol = col
+        while (currentRow < height && currentCol < width) {
+            screen[currentRow][currentCol].char ?: return Pair(currentRow, currentCol)
+            currentCol++
+            if (currentCol == width){
+                currentCol = 0
+                currentRow++
+            }
+        }
+        return null
+    }
+
+    fun insertCharAtCursor(ch: Char) {
+        // very naive implementation
+        // TODO: implement Cartesian Tree
+        val pair = getNextEmpty()
+        if (pair != null) {
+            val (row, col) = pair
+            var currentRow = row
+            var currentCol = col
+            while (currentRow != cursorRow || currentCol != cursorCol) {
+                var nextCol = currentCol-1
+                var nextRow = currentRow
+                if (nextCol == -1){
+                    nextCol = width-1
+                    nextRow--
+                }
+                screen[currentRow][currentCol] = screen[nextRow][nextCol].copy()
+                currentRow = nextRow
+                currentCol = nextCol
+            }
+            overrideCharAtCursor(ch)
+        }
+        else {
+            //if cursor is not on the first line, we need to append a new empty line and shift all by one character,
+            //like in case where next non-empty cell exists
+            if (cursorRow > 0) {
+                insertEmptyLine()
+                cursorRow--
+                var currentRow = height - 1
+                var currentCol = 0
+                while (currentRow != cursorRow || currentCol != cursorCol) {
+                    var nextCol = currentCol - 1
+                    var nextRow = currentRow
+                    if (nextCol == -1) {
+                        nextCol = width - 1
+                        nextRow--
+                    }
+                    screen[currentRow][currentCol] = screen[nextRow][nextCol].copy()
+                    currentRow = nextRow
+                    currentCol = nextCol
+                }
+                overrideCharAtCursor(ch)
+            }
+            //However, if the whole screen is occupied and we want to insert in the first line, what we insert
+            // immediately goes to scrollback.
+            else {
+                //insert empty line and shift all what's left on the screen
+                insertEmptyLine()
+                var currentRow = height - 1
+                var currentCol = 0
+                while (currentRow != 0 || currentCol != 0) {
+                    var nextCol = currentCol - 1
+                    var nextRow = currentRow
+                    if (nextCol == -1) {
+                        nextCol = width - 1
+                        nextRow--
+                    }
+                    screen[currentRow][currentCol] = screen[nextRow][nextCol].copy()
+                    currentRow = nextRow
+                    currentCol = nextCol
+                }
+                //manually change the first line of the scrollback
+                screen[0][0] = scrollback[0][width-1].copy()
+                for (idx in width-1 downTo cursorCol+1) {
+                    scrollback[0][idx] = scrollback[0][idx-1].copy()
+                }
+                scrollback[0][cursorCol] = Cell(ch, currentAttributes)
+                //idk where to put cursor now, so just put it in the beginning of the screen
+                setCursor(0,0)
+            }
+        }
+    }
+
+    fun insertTextAtCursor(s: String) {
+        for (ch in s){
+            insertCharAtCursor(ch)
+        }
+    }
 }
