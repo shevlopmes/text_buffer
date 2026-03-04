@@ -1,11 +1,11 @@
 package org.example
 
 class TerminalBuffer (
-    val width: Int,
-    val height: Int,
+    var width: Int,
+    var height: Int,
     val maxScrollbackLines: Int = 1000
 ) {
-    private val screen: Array<Array<Cell>> = Array(height) {Array(width) { Cell() } }
+    private var screen: Array<Array<Cell>> = Array(height) {Array(width) { Cell() } }
     private val scrollback: ArrayDeque<Array<Cell>> = ArrayDeque()
     private var cursorCol : Int = 0
     private var cursorRow : Int = 0
@@ -246,5 +246,39 @@ class TerminalBuffer (
         }
     }
 
+    fun resize(newWidth: Int, newHeight: Int) {
+        val cells = buildList {
+            for (row in -scrollback.size until height) {
+                for (col in 0 until width) {
+                    add(getCell(row, col)!!)
+                }
+            }
+        }
 
+        val lastIdx = cells.indexOfLast { it.char != null }
+        val content = if (lastIdx == -1) emptyList() else cells.subList(0, lastIdx + 1)
+
+        width = newWidth
+        height = newHeight
+        screen = Array(height) { Array(width) { Cell() } }
+        scrollback.clear()
+        setCursor(0, 0)
+        var ptr = content.size - 1
+        for (row in height-1 downTo 0) {
+            for (col in width-1 downTo 0) {
+                if (ptr < 0){
+                    screen[row][col] = Cell()
+                } else {
+                    screen[row][col] = content[ptr].copy()
+                    ptr--
+                }
+            }
+        }
+        while (ptr > 0 && scrollback.size < maxScrollbackLines){
+            scrollback.addLast(Array (width) {it -> if (ptr<0)
+            {Cell()}
+            else {content[ptr--]
+            }}.reversedArray())
+        }
+    }
 }

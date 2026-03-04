@@ -407,4 +407,74 @@ class TerminalBufferTest {
         val all = buffer.getScreenAndScrollBack()
         assertEquals("AXB\nCDE\nF  ", all)
     }
+
+    @Test
+    fun ResizeCursorResets() {
+        val buffer = TerminalBuffer(10, 5)
+        buffer.overrideTextAtCursor("Hello")
+        buffer.setCursor(2, 3)
+        buffer.resize(20, 10)
+        val (row, col) = buffer.getCursor()
+        assertEquals(0, row)
+        assertEquals(0, col)
+    }
+
+    @Test
+    fun ResizeUpdatesWidthAndHeight() {
+        val buffer = TerminalBuffer(10, 5)
+        buffer.resize(30, 15)
+        assertEquals(30, buffer.width)
+        assertEquals(15, buffer.height)
+    }
+
+    @Test
+    fun ResizeEmptyBufferProducesEmptyScreen() {
+        val buffer = TerminalBuffer(10, 5)
+        buffer.resize(20, 10)
+        for (row in 0 until buffer.height) {
+            for (col in 0 until buffer.width) {
+                assertNull(buffer.getCell(row, col)!!.char)
+            }
+        }
+    }
+
+    @Test
+    fun ResizeShrinkWidthReflowsContent() {
+        val buffer = TerminalBuffer(6, 2)
+        buffer.overrideTextAtCursor("ABCDEF")
+        buffer.resize(3, 2)
+        assertEquals("ABC", buffer.getLineAt(0))
+        assertEquals("DEF", buffer.getLineAt(1))
+    }
+
+    @Test
+    fun ResizeTestFitOnScreen() {
+        val buffer = TerminalBuffer(10, 3)
+        buffer.overrideTextAtCursor("ABC")
+        buffer.resize(2,2)
+        val screen = buffer.getScreen()
+        assertEquals(" A\nBC", screen)
+    }
+
+    @Test
+    fun ResizeOverflowGoesToScrollback() {
+        val buffer = TerminalBuffer(20, 1)
+        buffer.overrideTextAtCursor("ABCDEFGHIJKLMNOPQRST")
+        buffer.resize(5, 1)
+        assertEquals("PQRST", buffer.getLineAt(0))
+        assertEquals("ABCDE", buffer.getLineAt(-3))
+        assertEquals("FGHIJ", buffer.getLineAt(-2))
+        assertEquals("KLMNO", buffer.getLineAt(-1))
+    }
+
+    @Test
+    fun ResizeRespectsMaxScrollbackLines() {
+        val buffer = TerminalBuffer(20, 1, 2)
+        buffer.overrideTextAtCursor("ABCDEFGHIJKLMNOPQRST")
+        buffer.resize(5, 1)
+        assertEquals("PQRST", buffer.getLineAt(0))
+        assertNull (buffer.getLineAt(-3))
+        assertEquals("FGHIJ", buffer.getLineAt(-2))
+        assertEquals("KLMNO", buffer.getLineAt(-1))
+    }
 }
