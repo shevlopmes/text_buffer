@@ -58,6 +58,30 @@ class TerminalBuffer (
         currentAttributes = attributes
     }
 
+    fun setBold(value: Boolean = true) {
+        currentAttributes = currentAttributes.copy(bold = value)
+    }
+
+    fun setItalic(value: Boolean = true) {
+        currentAttributes = currentAttributes.copy(italic = value)
+    }
+
+    fun setUnderline(value: Boolean = true) {
+        currentAttributes = currentAttributes.copy(underline = value)
+    }
+
+    fun setForeground(colour: Colour) {
+        currentAttributes = currentAttributes.copy(foreground = colour)
+    }
+
+    fun setBackground(colour: Colour) {
+        currentAttributes = currentAttributes.copy(background = colour)
+    }
+
+    fun resetAttributes() {
+        currentAttributes = Attributes()
+    }
+
     fun insertEmptyLine() {
         val addToScrollback = screen[0].copyOf()
         for (row in 0 until height-1) {

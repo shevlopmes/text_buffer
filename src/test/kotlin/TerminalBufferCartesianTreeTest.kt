@@ -462,4 +462,101 @@ class TerminalBufferCartesianTreeTest {
 
         assertEquals(Pair(1, 0), buffer.getCursor())
     }
+
+    @Test
+    fun SetBoldTest() {
+        val buffer = TerminalBuffer(5, 5)
+        buffer.setBold()
+        buffer.overrideCharAtCursor('A')
+        buffer.moveCursor('l', 1)
+        assertTrue(buffer.getAttributesAt()!!.bold)
+    }
+
+    @Test
+    fun SetBoldFalseTest() {
+        val buffer = TerminalBuffer(5, 5)
+        buffer.setBold()
+        buffer.setBold(false)
+        buffer.overrideCharAtCursor('A')
+        buffer.moveCursor('l', 1)
+        assertFalse(buffer.getAttributesAt()!!.bold)
+    }
+
+    @Test
+    fun SetItalicTest() {
+        val buffer = TerminalBuffer(5, 5)
+        buffer.setItalic()
+        buffer.overrideCharAtCursor('B')
+        buffer.moveCursor('l', 1)
+        assertTrue(buffer.getAttributesAt()!!.italic)
+    }
+
+    @Test
+    fun SetUnderlineTest() {
+        val buffer = TerminalBuffer(5, 5)
+        buffer.setUnderline()
+        buffer.overrideCharAtCursor('C')
+        buffer.moveCursor('l', 1)
+        assertTrue(buffer.getAttributesAt()!!.underline)
+    }
+
+    @Test
+    fun SetForegroundTest() {
+        val buffer = TerminalBuffer(5, 5)
+        buffer.setForeground(Colour.RED)
+        buffer.overrideCharAtCursor('D')
+        buffer.moveCursor('l', 1)
+        assertEquals(Colour.RED, buffer.getAttributesAt()!!.foreground)
+    }
+
+    @Test
+    fun SetBackgroundTest() {
+        val buffer = TerminalBuffer(5, 5)
+        buffer.setBackground(Colour.BLUE)
+        buffer.overrideCharAtCursor('E')
+        buffer.moveCursor('l', 1)
+        assertEquals(Colour.BLUE, buffer.getAttributesAt()!!.background)
+    }
+
+    @Test
+    fun ResetAttributesTest() {
+        val buffer = TerminalBuffer(5, 5)
+        buffer.setBold()
+        buffer.setItalic()
+        buffer.setForeground(Colour.GREEN)
+        buffer.resetAttributes()
+        buffer.overrideCharAtCursor('F')
+        buffer.moveCursor('l', 1)
+        assertEquals(Attributes(), buffer.getAttributesAt())
+    }
+
+    @Test
+    fun AttributesDoNotAffectOtherCells() {
+        val buffer = TerminalBuffer(5, 5)
+        buffer.setBold()
+        buffer.overrideCharAtCursor('X')  // (0,0) — bold
+        buffer.resetAttributes()
+        buffer.overrideCharAtCursor('Y')  // (0,1) — default
+        assertFalse(buffer.getAttributesAt(0, 1)!!.bold)
+        assertTrue(buffer.getAttributesAt(0, 0)!!.bold)
+    }
+
+    @Test
+    fun CombinedAttributesTest() {
+        val buffer = TerminalBuffer(5, 5)
+        buffer.setBold()
+        buffer.setItalic()
+        buffer.setUnderline()
+        buffer.setForeground(Colour.CYAN)
+        buffer.setBackground(Colour.BLACK)
+        buffer.overrideCharAtCursor('Z')
+        buffer.moveCursor('l', 1)
+        val attrs = buffer.getAttributesAt()!!
+        assertTrue(attrs.bold)
+        assertTrue(attrs.italic)
+        assertTrue(attrs.underline)
+        assertEquals(Colour.CYAN, attrs.foreground)
+        assertEquals(Colour.BLACK, attrs.background)
+    }
+
 }
