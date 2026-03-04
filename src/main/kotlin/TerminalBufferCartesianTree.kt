@@ -1,15 +1,23 @@
 package org.example
 
-class TerminalBuffer (
+class TerminalBufferCartesianTree (
     val width: Int,
     val height: Int,
     val maxScrollbackLines: Int = 1000
 ) {
-    private val screen: Array<Array<Cell>> = Array(height) {Array(width) { Cell() } }
+    private val screen = CartesianTree()
     private val scrollback: ArrayDeque<Array<Cell>> = ArrayDeque()
     private var cursorCol : Int = 0
     private var cursorRow : Int = 0
     var currentAttributes : Attributes  = Attributes()
+
+    private fun pos(row: Int, col: Int): Int = row * width + col
+
+    init {
+        repeat (width * height) {
+            screen.insert(0,Cell() )
+        }
+    }
 
     fun getCursor(): Pair<Int, Int> {
         return Pair(cursorRow, cursorCol)
@@ -44,7 +52,7 @@ class TerminalBuffer (
 
     fun getCell (row: Int, col: Int): Cell? {
         if (inBounds(row, col)) {
-            return screen[row][col]
+            return screen.get(pos(row, col))
         }
         val modifiedRow = -row-1
         if (modifiedRow in 0..<scrollback.size && col in 0..<width) {
@@ -59,19 +67,18 @@ class TerminalBuffer (
     }
 
     fun insertEmptyLine() {
-        val addToScrollback = screen[0].copyOf()
-        for (row in 0 until height-1) {
-            screen[row] = screen[row + 1].copyOf()
-        }
-        screen[height-1] = Array (width) { Cell() }
+        val addToScrollback = Array(width) {screen.get(pos(0,it))!!}
         scrollback.addFirst(addToScrollback)
         if (scrollback.size > maxScrollbackLines) {
             scrollback.removeLast()
         }
+        val (toDelete, rest) = screen.split(screen.root,width)
+        screen.root = rest
+        repeat(width) {screen.insert((height-1)*width, Cell())}
     }
 
     fun overrideCharAtCursor(ch: Char) {
-        screen[cursorRow][cursorCol] = Cell(ch, currentAttributes)
+        screen.set(pos(cursorRow, cursorCol), Cell(ch, currentAttributes))
         if (moveCursor('r',1)){ //if not at the end of the line
             return
         }
@@ -90,8 +97,8 @@ class TerminalBuffer (
     }
 
     fun clearScreen() {
-        for (row in 0 until height) {
-            screen[row].fill(Cell())
+        repeat(width * height) { idx ->
+            screen.set(idx, Cell())
         }
         setCursor(0,0)
     }
@@ -102,12 +109,14 @@ class TerminalBuffer (
     }
 
     fun fillCurrentLine (ch: Char? = null) { //to fill with empty, call with no parameters
-        screen[cursorRow].fill(Cell(ch, currentAttributes))
+        repeat(width) { idx ->
+            screen.set(pos(cursorRow, idx), Cell(ch, currentAttributes))
+        }
     }
 
     fun getCharAt(row: Int = cursorRow, col: Int = cursorCol): Char? {
         if (inBounds(row, col)) {
-            return screen[row][col].char
+            return screen.get(pos(row,col))!!.char
         }
         val modifiedRow = -row-1
         if (col in 0..<width && modifiedRow in  0..<scrollback.size) {
@@ -118,7 +127,7 @@ class TerminalBuffer (
 
     fun getAttributesAt(row: Int = cursorRow, col: Int = cursorCol): Attributes? {
         if (inBounds(row, col)) {
-            return screen[row][col].attributes
+            return screen.get(pos(row,col))!!.attributes
         }
         val modifiedRow = -row-1
         if (col in 0..<width && modifiedRow in 0..<scrollback.size) {
@@ -131,7 +140,7 @@ class TerminalBuffer (
         if (row in 0..<height) {
             return buildString {
                 for (col in 0 until width) {
-                    val ch = screen[row][col].char ?: ' '
+                    val ch = screen.get(pos(row,col))!!.char ?: ' '
                     append(ch)
                 }
             }
@@ -149,18 +158,25 @@ class TerminalBuffer (
     }
 
     fun getScreen(): String {
-        return (0..<height).joinToString("\n") { row -> getLineAt(row)!! }
+        val allChars = screen.getScreen()
+        return allChars.chunked(width).take(height).joinToString("\n")
     }
 
     fun getScreenAndScrollBack(): String {
-        return (-scrollback.size..<height).joinToString("\n") { row -> getLineAt(row)!! }
+        val scrollbackString =  (-scrollback.size..<0).joinToString("\n") { row -> getLineAt(row)!! }
+        val screenString = getScreen()
+        return if (scrollbackString.isEmpty()) {
+            screenString
+        } else {
+            scrollbackString + "\n" + screenString
+        }
     }
 
     fun getNextEmpty(row: Int = cursorRow, col: Int = cursorCol): Pair<Int, Int>? {
         var currentRow = row
         var currentCol = col
         while (currentRow < height && currentCol < width) {
-            screen[currentRow][currentCol].char ?: return Pair(currentRow, currentCol)
+            screen.get(pos(currentRow, currentCol))!!.char ?: return Pair(currentRow, currentCol)
             currentCol++
             if (currentCol == width){
                 currentCol = 0
@@ -170,24 +186,25 @@ class TerminalBuffer (
         return null
     }
 
+    fun moveCursorOneStep(){
+        if (moveCursor('r',1)){ //if not at the end of the line
+            return
+        }
+        if (moveCursor('d',1)) { //if at the end of the line, but not at the bottom of the screen
+            moveCursor('b')
+            return
+        }
+        insertEmptyLine()
+        moveCursor('b')
+    }
+
     fun insertCharAtCursor(ch: Char) {
         val pair = getNextEmpty()
         if (pair != null) {
             val (row, col) = pair
-            var currentRow = row
-            var currentCol = col
-            while (currentRow != cursorRow || currentCol != cursorCol) {
-                var nextCol = currentCol-1
-                var nextRow = currentRow
-                if (nextCol == -1){
-                    nextCol = width-1
-                    nextRow--
-                }
-                screen[currentRow][currentCol] = screen[nextRow][nextCol].copy()
-                currentRow = nextRow
-                currentCol = nextCol
-            }
-            overrideCharAtCursor(ch)
+            screen.delete(pos(row,col))
+            screen.insert(pos(cursorRow,cursorCol), Cell(ch, currentAttributes))
+            moveCursorOneStep()
         }
         else {
             //if cursor is not on the first line, we need to append a new empty line and shift all by one character,
@@ -195,41 +212,22 @@ class TerminalBuffer (
             if (cursorRow > 0) {
                 insertEmptyLine()
                 cursorRow--
-                var currentRow = height - 1
-                var currentCol = 0
-                while (currentRow != cursorRow || currentCol != cursorCol) {
-                    var nextCol = currentCol - 1
-                    var nextRow = currentRow
-                    if (nextCol == -1) {
-                        nextCol = width - 1
-                        nextRow--
-                    }
-                    screen[currentRow][currentCol] = screen[nextRow][nextCol].copy()
-                    currentRow = nextRow
-                    currentCol = nextCol
-                }
-                overrideCharAtCursor(ch)
+                val row = height - 1
+                val col = width - 1
+                screen.delete(pos(row,col))
+                screen.insert(pos(cursorRow,cursorCol), Cell(ch, currentAttributes))
+                moveCursorOneStep()
             }
             //However, if the whole screen is occupied and we want to insert in the first line, what we insert
             // immediately goes to scrollback.
             else {
                 //insert empty line and shift all what's left on the screen
                 insertEmptyLine()
-                var currentRow = height - 1
-                var currentCol = 0
-                while (currentRow != 0 || currentCol != 0) {
-                    var nextCol = currentCol - 1
-                    var nextRow = currentRow
-                    if (nextCol == -1) {
-                        nextCol = width - 1
-                        nextRow--
-                    }
-                    screen[currentRow][currentCol] = screen[nextRow][nextCol].copy()
-                    currentRow = nextRow
-                    currentCol = nextCol
-                }
+                val row= height - 1
+                val col = width - 1
+                screen.delete(pos(row,col))
                 //manually change the first line of the scrollback
-                screen[0][0] = scrollback[0][width-1].copy()
+                screen.insert(0,scrollback[0][width-1].copy())
                 for (idx in width-1 downTo cursorCol+1) {
                     scrollback[0][idx] = scrollback[0][idx-1].copy()
                 }
@@ -245,6 +243,4 @@ class TerminalBuffer (
             insertCharAtCursor(ch)
         }
     }
-
-
 }
